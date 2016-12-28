@@ -1,5 +1,10 @@
 package ambassador
 
+import (
+	"io"
+	"net/http"
+)
+
 type Message struct {
 	SenderId    string
 	RecipientId string
@@ -8,15 +13,15 @@ type Message struct {
 }
 
 type Ambassador interface {
-	Translate(b []byte) (messages []Message, err error)
-	SendText(text string) (err error)
-	SendTemplate(b []byte) (err error)
+	Translate(r io.Reader) (messages []Message, err error)
+	SendText(recipientId string, text string) (err error)
+	SendTemplate(recipientId string, elements interface{}) (err error)
 }
 
-func New(source, token string) (a Ambassador) {
+func New(source, token string, client *http.Client) (a Ambassador) {
 	switch source {
 	case "facebook":
-		return &FBAmbassador{token}
+		return NewFBAmbassador(token, client)
 	}
 	return
 }
