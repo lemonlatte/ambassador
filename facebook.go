@@ -42,6 +42,7 @@ type FBMessage struct {
 type FBMessageContent struct {
 	Text        string                `json:"text"`
 	Seq         int64                 `json:"seq,omitempty"`
+	IsEcho      bool                  `json:"is_echo,omitempty"`
 	Attachments []FBMessageAttachment `json:"attachments,omitempty"`
 	QuickReplay *FBMessageQuickReply  `json:"quick_reply,omitempty"`
 }
