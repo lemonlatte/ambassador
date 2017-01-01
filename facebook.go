@@ -160,6 +160,21 @@ func (a *FBAmbassador) send(payload interface{}) (err error) {
 	return
 }
 
+// AskQuestion sends a question style text to a recipient.
+func (a *FBAmbassador) AskQuestion(recipientId string, text string, answers []map[string]string) (err error) {
+	message := map[string]interface{}{
+		"text":          text,
+		"quick_replies": answers,
+	}
+	payload := map[string]interface{}{
+		"recipient": FBRecipient{recipientId},
+		"message":   message,
+	}
+
+	err = a.send(payload)
+	return
+}
+
 // SendText sends a text message to a recipient.
 func (a *FBAmbassador) SendText(recipientId string, text string) (err error) {
 	message := map[string]string{"text": text}

@@ -14,6 +14,7 @@ type Message struct {
 
 type Ambassador interface {
 	Translate(r io.Reader) (messages []Message, err error)
+	AskQuestion(recipientId string, text string, answers []map[string]string) (err error)
 	SendText(recipientId string, text string) (err error)
 	SendTemplate(recipientId string, elements interface{}) (err error)
 }
