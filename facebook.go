@@ -36,6 +36,7 @@ type FBMessage struct {
 	Content   *FBMessageContent  `json:"message,omitempty"`
 	Delivery  *FBMessageDelivery `json:"delivery,omitempty"`
 	Postback  *FBMessagePostback `json:"postback,omitempty"`
+	Read      *FBMessageRead     `json:"read,omitempty"`
 }
 
 type FBMessageContent struct {
@@ -77,6 +78,11 @@ type Location struct {
 type FBMessageTemplate struct {
 	Type     string      `json:"template_type"`
 	Elements interface{} `json:"elements"`
+}
+
+type FBMessageRead struct {
+	Watermark int64 `json:"watermark"`
+	Seq       int64 `json:"seq"`
 }
 
 type FBButtonItem struct {
@@ -125,6 +131,8 @@ func (a *FBAmbassador) Translate(r io.Reader) (messages []Message, err error) {
 				msg.Body = fbMsg.Delivery
 			} else if fbMsg.Postback != nil {
 				msg.Body = fbMsg.Postback
+			} else if fbMsg.Read != nil {
+				msg.Body = fbMsg.Read
 			}
 
 			messages = append(messages, msg)
