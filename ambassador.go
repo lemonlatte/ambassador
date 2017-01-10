@@ -9,7 +9,20 @@ type Message struct {
 	SenderId    string
 	RecipientId string
 	Timestamp   int64
-	Body        interface{}
+	Content     interface{}
+}
+
+type LocationContent struct {
+	Lat float64
+	Lon float64
+}
+
+type TextContent struct {
+	Text string
+}
+
+type CommandContent struct {
+	Payload string
 }
 
 type Ambassador interface {

@@ -127,15 +127,33 @@ func (a *FBAmbassador) Translate(r io.Reader) (messages []Message, err error) {
 				Timestamp:   fbMsg.Timestamp,
 			}
 			if fbMsg.Content != nil {
-				msg.Body = fbMsg.Content
+				if attachments := fbMsg.Content.Attachments; len(attachments) != 0 {
+					a := attachments[0]
+					if a.Type == "location" {
+						payload := FBLocationAttachment{}
+						err = json.Unmarshal(a.Payload, &payload)
+						if err != nil {
+							return
+						}
+						msg.Content = &LocationContent{
+							Lat: payload.Coordinates.Latitude,
+							Lon: payload.Coordinates.Longitude,
+						}
+					} else {
+						msg.Content = fbMsg.Content
+					}
+				} else if fbMsg.Content.QuickReplay != nil {
+					msg.Content = &CommandContent{Payload: fbMsg.Content.QuickReplay.Payload}
+				} else {
+					msg.Content = &TextContent{Text: fbMsg.Content.Text}
+				}
 			} else if fbMsg.Delivery != nil {
-				msg.Body = fbMsg.Delivery
+				msg.Content = fbMsg.Delivery
 			} else if fbMsg.Postback != nil {
-				msg.Body = fbMsg.Postback
+				msg.Content = &CommandContent{Payload: fbMsg.Postback.Payload}
 			} else if fbMsg.Read != nil {
-				msg.Body = fbMsg.Read
+				msg.Content = fbMsg.Read
 			}
-
 			messages = append(messages, msg)
 		}
 	}
