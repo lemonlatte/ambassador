@@ -144,6 +144,8 @@ func (a *FBAmbassador) Translate(r io.Reader) (messages []Message, err error) {
 					}
 				} else if fbMsg.Content.QuickReplay != nil {
 					msg.Content = &CommandContent{Payload: fbMsg.Content.QuickReplay.Payload}
+				} else if fbMsg.Content.IsEcho {
+					msg.Content = fbMsg.Content
 				} else {
 					msg.Content = &TextContent{Text: fbMsg.Content.Text}
 				}
