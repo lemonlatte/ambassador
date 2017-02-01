@@ -27,9 +27,24 @@ type CommandContent struct {
 
 type Ambassador interface {
 	Translate(r io.Reader) (messages []Message, err error)
-	AskQuestion(recipientId string, text string, answers []map[string]string) (err error)
-	SendText(recipientId string, text string) (err error)
-	SendTemplate(recipientId string, elements interface{}) (err error)
+	AskQuestion(text string, answers []map[string]string) (err error)
+	SendText(text string) (err error)
+	SendTemplate(elements interface{}) (err error)
+	Send(recipientId string) (err error)
+}
+
+type CarouselButton struct {
+	Label string
+	Type  string
+	Data  string
+}
+
+type Carousel struct {
+	Title    string
+	Text     string
+	ImageUrl string
+	ItemUrl  string
+	Buttons  []CarouselButton
 }
 
 func New(source, token string, client *http.Client) (a Ambassador) {

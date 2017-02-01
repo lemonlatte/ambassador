@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 )
 
 const LineBotReplyURI = "https://api.line.me/v2/bot/message/reply"
@@ -44,6 +45,7 @@ type LinePostback struct {
 }
 
 type LineAmbassador struct {
+	sync.Mutex
 	channelToken string
 	client       *http.Client
 	messages     []interface{}
@@ -90,7 +92,7 @@ func (l *LineAmbassador) Translate(r io.Reader) (messages []Message, err error) 
 func (l *LineAmbassador) sendReply(recipientId string, messages interface{}) (err error) {
 	payload := map[string]interface{}{
 		"replyToken": recipientId,
-		"messages":   messages,
+		"messages":   l.messages,
 	}
 
 	b, err := json.Marshal(payload)
@@ -119,7 +121,7 @@ func (l *LineAmbassador) sendReply(recipientId string, messages interface{}) (er
 	return
 }
 
-func (l *LineAmbassador) AskQuestion(recipientId string, text string, answers []map[string]string) (err error) {
+func (l *LineAmbassador) AskQuestion(text string, answers []map[string]string) (err error) {
 	actions := []map[string]string{}
 	var upperBound int
 	if upperBound = len(answers) - 4; upperBound < 0 {
@@ -138,7 +140,7 @@ func (l *LineAmbassador) AskQuestion(recipientId string, text string, answers []
 		}
 	}
 
-	quesPayload := map[string]interface{}{
+	question := map[string]interface{}{
 		"type":    "template",
 		"altText": "this is a buttons template",
 		"template": map[string]interface{}{
@@ -149,38 +151,67 @@ func (l *LineAmbassador) AskQuestion(recipientId string, text string, answers []
 		},
 	}
 
-	err = l.sendReply(recipientId, []interface{}{quesPayload})
+	l.Lock()
+	defer l.Unlock()
+	l.messages = append(l.messages, question)
 	return
 }
 
-func (l *LineAmbassador) SendText(recipientId string, text string) (err error) {
-	messages := []map[string]string{
+func (l *LineAmbassador) SendText(text string) (err error) {
+	textMessage := []map[string]string{
 		{"type": "text", "text": text},
 	}
-
-	err = l.sendReply(recipientId, messages)
+	l.Lock()
+	defer l.Unlock()
+	l.messages = append(l.messages, textMessage)
 	return
 }
 
-func (l *LineAmbassador) SendTemplate(recipientId string, elements interface{}, bulked bool) (err error) {
-
+func (l *LineAmbassador) SendTemplate(elements interface{}) (err error) {
 	columns := []map[string]interface{}{}
-	colItems, ok := elements.([]map[string]interface{})
+	colItems, ok := elements.([]Carousel)
 	if !ok {
-		return fmt.Errorf("can not assert the elements' type")
+		return fmt.Errorf("can not type assert the elements")
 	}
 
-	for _, col := range colItems {
-		columns = append(columns, map[string]interface{}{
-			"title":             col["title"],
-			"text":              col["subtitle"],
-			"thumbnailImageUrl": col["image_url"].(string),
-			"actions": []map[string]string{
-				{"type": "uri", "label": "檢視",
-					"uri": col["item_url"].(string),
-				},
-			},
-		})
+	for i, col := range colItems {
+		if i > 5 {
+			break
+		}
+		item := map[string]interface{}{
+			"title":             col.Title,
+			"text":              col.Text,
+			"thumbnailImageUrl": col.ImageUrl,
+		}
+
+		actions := []map[string]string{}
+		if col.ItemUrl != "" {
+			actions = append(actions,
+				map[string]string{
+					"type": "uri", "label": "Item Link",
+					"uri": col.ItemUrl,
+				})
+		}
+
+		for _, btn := range col.Buttons {
+			if len(actions) > 4 {
+				break
+			}
+			action := map[string]string{"label": btn.Label}
+
+			switch btn.Type {
+			case "url":
+				action["type"] = "uri"
+				action["uri"] = btn.Data
+			}
+			actions = append(actions, action)
+		}
+
+		if len(actions) > 0 {
+			item["actions"] = actions
+		}
+
+		columns = append(columns, item)
 	}
 
 	carousel := map[string]interface{}{
@@ -191,17 +222,22 @@ func (l *LineAmbassador) SendTemplate(recipientId string, elements interface{}, 
 			"columns": columns,
 		},
 	}
-
-	err = l.sendReply(recipientId, []interface{}{carousel})
-	if err != nil {
-		b, _ := json.Marshal([]interface{}{carousel})
-		return fmt.Errorf("%s, %s", err.Error(), b)
-	}
+	l.Lock()
+	defer l.Unlock()
+	l.messages = append(l.messages, carousel)
 	return
 }
 
 func (l *LineAmbassador) Send(recipientId string) (err error) {
+	defer l.cleanMessage()
+	err = l.sendReply(recipientId, l.messages)
 	return
+}
+
+func (l *LineAmbassador) cleanMessage() {
+	l.Lock()
+	defer l.Unlock()
+	l.messages = []interface{}{}
 }
 
 func NewLineAmbassador(channelToken string, client *http.Client) *LineAmbassador {

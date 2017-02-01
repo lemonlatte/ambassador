@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 )
 
 const FBMessengerBaseURI = "https://graph.facebook.com/v2.6/me/messages?access_token="
@@ -94,8 +95,10 @@ type FBButtonItem struct {
 }
 
 type FBAmbassador struct {
-	token  string
-	client *http.Client
+	sync.Mutex
+	token    string
+	client   *http.Client
+	messages []interface{}
 }
 
 func NewFBAmbassador(token string, client *http.Client) *FBAmbassador {
@@ -164,63 +167,113 @@ func (a *FBAmbassador) Translate(r io.Reader) (messages []Message, err error) {
 
 // send function will unmarshal any object into json string and then
 // submit a http request to the facebook messenger api endpoint
-func (a *FBAmbassador) send(payload interface{}) (err error) {
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-
+func (a *FBAmbassador) sendMessages(recipientId string) (err error) {
 	fbApiUrl := FBMessengerBaseURI + a.token
-	resp, err := a.client.Post(fbApiUrl, "application/json", bytes.NewBuffer(b))
-	if err != nil {
-		return
-	}
 
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		buffer := &bytes.Buffer{}
-		_, err = io.Copy(buffer, resp.Body)
-		if err != nil {
-			return
+	for _, msgPayload := range a.messages {
+		payload, ok := msgPayload.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("fail to type assert message: %+v", msgPayload)
 		}
-		err = fmt.Errorf("fail to deliver an fb message. status: %s, body: %s",
-			resp.Status, buffer.String())
+		payload["recipient"] = FBRecipient{recipientId}
+
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		resp, err := a.client.Post(fbApiUrl, "application/json", bytes.NewBuffer(b))
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode != 200 {
+			buffer := &bytes.Buffer{}
+			_, err := io.Copy(buffer, resp.Body)
+			resp.Body.Close()
+
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("fail to deliver an fb message. status: %s, body: %s",
+				resp.Status, buffer.String())
+		}
+		resp.Body.Close()
 	}
 	return
 }
 
 // AskQuestion sends a question style text to a recipient.
-func (a *FBAmbassador) AskQuestion(recipientId string, text string, answers []map[string]string) (err error) {
+func (a *FBAmbassador) AskQuestion(text string, answers []map[string]string) (err error) {
 	message := map[string]interface{}{
 		"text":          text,
 		"quick_replies": answers,
 	}
 	payload := map[string]interface{}{
-		"recipient": FBRecipient{recipientId},
-		"message":   message,
+		"message": message,
 	}
 
-	err = a.send(payload)
+	a.Lock()
+	defer a.Unlock()
+	a.messages = append(a.messages, payload)
 	return
 }
 
 // SendText sends a text message to a recipient.
-func (a *FBAmbassador) SendText(recipientId string, text string) (err error) {
+func (a *FBAmbassador) SendText(text string) (err error) {
 	message := map[string]string{"text": text}
 	payload := map[string]interface{}{
-		"recipient": FBRecipient{recipientId},
-		"message":   message,
+		"message": message,
 	}
 
-	err = a.send(payload)
+	a.Lock()
+	defer a.Unlock()
+	a.messages = append(a.messages, payload)
 	return
 }
 
 // SendTemplate sends a template message to a recipient.
-func (a *FBAmbassador) SendTemplate(recipientId string, template interface{}) (err error) {
+func (a *FBAmbassador) SendTemplate(elements interface{}) (err error) {
+
+	columns := []map[string]interface{}{}
+	colItems, ok := elements.([]Carousel)
+	if !ok {
+		return fmt.Errorf("can not type assert the elements")
+	}
+
+	for i, col := range colItems {
+		if i > 10 {
+			break
+		}
+
+		element := map[string]interface{}{
+			"title":     col.Title,
+			"image_url": col.ImageUrl,
+			"item_url":  col.ItemUrl,
+			"subtitle":  col.Text,
+		}
+		buttons := []FBButtonItem{}
+		for _, btn := range col.Buttons {
+			fbBtn := FBButtonItem{
+				Title: btn.Label,
+			}
+
+			switch btn.Type {
+			case "url":
+				fbBtn.Type = "web_url"
+				fbBtn.Url = btn.Data
+			}
+			buttons = append(buttons, fbBtn)
+		}
+		if len(buttons) > 0 {
+			element["buttons"] = buttons
+		}
+
+		columns = append(columns, element)
+	}
+
 	msgPayload := FBMessageTemplate{
 		Type:     "generic",
-		Elements: template,
+		Elements: columns,
 	}
 
 	msgBuf, err := json.Marshal(&msgPayload)
@@ -229,7 +282,6 @@ func (a *FBAmbassador) SendTemplate(recipientId string, template interface{}) (e
 	}
 
 	payload := map[string]interface{}{
-		"recipient": FBRecipient{recipientId},
 		"message": map[string]interface{}{
 			"attachment": &FBMessageAttachment{
 				Type:    "template",
@@ -238,6 +290,24 @@ func (a *FBAmbassador) SendTemplate(recipientId string, template interface{}) (e
 		},
 	}
 
-	err = a.send(payload)
+	a.Lock()
+	defer a.Unlock()
+	a.messages = append(a.messages, payload)
+	return
+}
+
+func (a *FBAmbassador) cleanMessage() {
+	a.Lock()
+	defer a.Unlock()
+	a.messages = []interface{}{}
+}
+
+func (a *FBAmbassador) Send(recipientId string) (err error) {
+	defer a.cleanMessage()
+	err = a.sendMessages(recipientId)
+	if err != nil {
+		b, _ := json.Marshal(a.messages)
+		return fmt.Errorf("%s, %s", err.Error(), b)
+	}
 	return
 }
