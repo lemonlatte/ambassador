@@ -175,7 +175,7 @@ func (l *LineAmbassador) SendTemplate(elements interface{}) (err error) {
 	}
 
 	for i, col := range colItems {
-		if i > 5 {
+		if i > 4 {
 			break
 		}
 		item := map[string]interface{}{
@@ -185,16 +185,9 @@ func (l *LineAmbassador) SendTemplate(elements interface{}) (err error) {
 		}
 
 		actions := []map[string]string{}
-		if col.ItemUrl != "" {
-			actions = append(actions,
-				map[string]string{
-					"type": "uri", "label": "Item Link",
-					"uri": col.ItemUrl,
-				})
-		}
 
 		for _, btn := range col.Buttons {
-			if len(actions) > 4 {
+			if len(actions) > 3 {
 				break
 			}
 			action := map[string]string{"label": btn.Label}
@@ -206,11 +199,14 @@ func (l *LineAmbassador) SendTemplate(elements interface{}) (err error) {
 			}
 			actions = append(actions, action)
 		}
-
-		if len(actions) > 0 {
-			item["actions"] = actions
+		if len(actions) == 0 && col.ItemUrl != "" {
+			actions = append(actions,
+				map[string]string{
+					"type": "uri", "label": "連結",
+					"uri": col.ItemUrl,
+				})
 		}
-
+		item["actions"] = actions
 		columns = append(columns, item)
 	}
 
