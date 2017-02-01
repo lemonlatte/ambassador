@@ -7,6 +7,7 @@ import (
 
 type Message struct {
 	SenderId    string
+	ReplyToken  string
 	RecipientId string
 	Timestamp   int64
 	Content     interface{}

@@ -63,9 +63,9 @@ func (l *LineAmbassador) Translate(r io.Reader) (messages []Message, err error) 
 
 	for _, event := range v.Events {
 		msg := Message{
-			SenderId:    event.Source.UserId,
-			Timestamp:   event.Timestamp,
-			RecipientId: event.ReplyToken,
+			SenderId:   event.Source.UserId,
+			ReplyToken: event.ReplyToken,
+			Timestamp:  event.Timestamp,
 		}
 		switch event.Type {
 		case "message":
