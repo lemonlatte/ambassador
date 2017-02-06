@@ -158,9 +158,8 @@ func (l *LineAmbassador) AskQuestion(text string, answers []map[string]string) (
 }
 
 func (l *LineAmbassador) SendText(text string) (err error) {
-	textMessage := []map[string]string{
-		{"type": "text", "text": text},
-	}
+	textMessage := map[string]string{"type": "text", "text": text}
+
 	l.Lock()
 	defer l.Unlock()
 	l.messages = append(l.messages, textMessage)
