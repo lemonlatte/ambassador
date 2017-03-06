@@ -88,10 +88,12 @@ type FBMessageRead struct {
 }
 
 type FBButtonItem struct {
-	Type    string `json:"type"`
-	Title   string `json:"title"`
-	Url     string `json:"url,omitempty"`
-	Payload string `json:"payload,omitempty"`
+	Type        string `json:"type"`
+	Title       string `json:"title,omitempty"`
+	Url         string `json:"url,omitempty"`
+	Payload     string `json:"payload,omitempty"`
+	HeightRatio string `json:"webview_height_ratio,omitempty"`
+	Extensions  bool   `json:"messenger_extensions,omitempty"`
 }
 
 type FBAmbassador struct {
@@ -254,14 +256,19 @@ func (a *FBAmbassador) SendTemplate(elements interface{}) (err error) {
 		}
 		buttons := []FBButtonItem{}
 		for _, btn := range col.Buttons {
-			fbBtn := FBButtonItem{
-				Title: btn.Label,
-			}
-
+			var fbBtn FBButtonItem
 			switch btn.Type {
+			case "share":
+				fbBtn.Type = "element_share"
+			case "account_link":
+				fbBtn.Type = btn.Type
+				fbBtn.Url = btn.Data
 			case "url":
+				fbBtn.Title = btn.Label
 				fbBtn.Type = "web_url"
 				fbBtn.Url = btn.Data
+				fbBtn.Extensions = btn.Extensions
+				fbBtn.HeightRatio = btn.HeightRatio
 			}
 			buttons = append(buttons, fbBtn)
 		}

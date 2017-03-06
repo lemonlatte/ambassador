@@ -36,9 +36,11 @@ type Ambassador interface {
 }
 
 type CarouselButton struct {
-	Label string
-	Type  string
-	Data  string
+	Label       string
+	Type        string
+	Data        string
+	HeightRatio string
+	Extensions  bool
 }
 
 type Carousel struct {
