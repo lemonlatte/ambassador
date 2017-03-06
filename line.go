@@ -49,6 +49,7 @@ type LineAmbassador struct {
 	channelToken string
 	client       *http.Client
 	messages     []interface{}
+	lastMessages []interface{}
 }
 
 func (l *LineAmbassador) Translate(r io.Reader) (messages []Message, err error) {
@@ -223,15 +224,24 @@ func (l *LineAmbassador) SendTemplate(elements interface{}) (err error) {
 	return
 }
 
+func (l *LineAmbassador) GetLastSent() []interface{} {
+	return l.lastMessages
+}
+
 func (l *LineAmbassador) Send(recipientId string) (err error) {
 	defer l.cleanMessage()
 	err = l.sendReply(recipientId, l.messages)
+	if err != nil {
+		b, _ := json.Marshal(l.messages)
+		return fmt.Errorf("%s, %s", err.Error(), b)
+	}
 	return
 }
 
 func (l *LineAmbassador) cleanMessage() {
 	l.Lock()
 	defer l.Unlock()
+	l.lastMessages = l.messages
 	l.messages = []interface{}{}
 }
 

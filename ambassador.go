@@ -30,6 +30,7 @@ type Ambassador interface {
 	Translate(r io.Reader) (messages []Message, err error)
 	AskQuestion(text string, answers []map[string]string) (err error)
 	SendText(text string) (err error)
+	GetLastSent() []interface{}
 	SendTemplate(elements interface{}) (err error)
 	Send(recipientId string) (err error)
 }

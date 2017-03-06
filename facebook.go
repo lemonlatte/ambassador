@@ -96,9 +96,10 @@ type FBButtonItem struct {
 
 type FBAmbassador struct {
 	sync.Mutex
-	token    string
-	client   *http.Client
-	messages []interface{}
+	token        string
+	client       *http.Client
+	messages     []interface{}
+	lastMessages []interface{}
 }
 
 func NewFBAmbassador(token string, client *http.Client) *FBAmbassador {
@@ -299,7 +300,12 @@ func (a *FBAmbassador) SendTemplate(elements interface{}) (err error) {
 func (a *FBAmbassador) cleanMessage() {
 	a.Lock()
 	defer a.Unlock()
+	a.lastMessages = a.messages
 	a.messages = []interface{}{}
+}
+
+func (a *FBAmbassador) GetLastSent() []interface{} {
+	return a.lastMessages
 }
 
 func (a *FBAmbassador) Send(recipientId string) (err error) {
